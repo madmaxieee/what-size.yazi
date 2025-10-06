@@ -45,24 +45,28 @@ local function get_total_size(items)
     end
     return total
   else
-    local arg = ya.target_os() == "macos" and "-scA" or "-scb"
-    -- pass args as string
-    local cmd = Command("du"):arg(arg)
-    for _, path in ipairs(items) do
-      cmd = cmd:arg(path)
-    end
-    local output, err = cmd:output()
+    local gnu_du_args = "-scb"
+    local darwin_du_args = "-scA"
 
-    if not output then
-      ya.err("Failed to run du: " .. err)
+    for _, arg in ipairs({
+      gnu_du_args,
+      darwin_du_args,
+    }) do
+      local cmd = Command("du"):arg(arg)
+      for _, path in ipairs(items) do
+        cmd = cmd:arg(path)
+      end
+      local output, err = cmd:output()
+      if not err and output.stdout ~= "" then
+        local lines = {}
+        for line in output.stdout:gmatch("[^\n]+") do
+          lines[#lines + 1] = line
+        end
+        local last_line = lines[#lines]
+        local size = tonumber(last_line:match("^(%d+)"))
+        return arg == darwin_du_args and size * 512 or size
+      end
     end
-    local lines = {}
-    for line in output.stdout:gmatch("[^\n]+") do
-      lines[#lines + 1] = line
-    end
-    local last_line = lines[#lines]
-    local size = tonumber(last_line:match("^(%d+)"))
-    return ya.target_os() == "macos" and size * 512 or size
   end
 end
 
